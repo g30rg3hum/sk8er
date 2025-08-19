@@ -22,7 +22,6 @@ export async function createClient() {
             );
           } catch (error) {
             // Setting cookies should fail silently
-            // TODO: Need middleware to refresh tokens [SK8-6]
             if (process.env.NODE_ENV === "development") {
               console.warn(
                 "Cookie setting failed in Server Component (this is expected):",
