@@ -44,7 +44,7 @@ export async function updateSession(request: NextRequest) {
 
   if (
     !user &&
-    request.nextUrl.pathname !== "/" && // Don't redirect on homepage. TODO: Do we want to change this?
+    request.nextUrl.pathname !== "/" && // Don't redirect on homepage.
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth") &&
     !request.nextUrl.pathname.startsWith("/error")

@@ -51,7 +51,8 @@ export async function signup(formData: FormData) {
   };
 
   // NOTE: no error when signing up with duplicate email (VERIFIED OR NOT).
-  // TODO: need to handle duplicate emails.
+  // TODO: need to handle duplicate emails (already verified)
+  // TODO: sent confirmation email
   const { error } = await supabase.auth.signUp(data);
 
   // NOTE: throws error if too frequent signUp requests. over_email_send_rate_limit
@@ -61,8 +62,6 @@ export async function signup(formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-  // Email confirmation still required.
-  // Never goes to "/", middleware always redirects to "/login"
-  // TODO: do we want to be able to go to "/" even not logged in?
+  // Email confirmation still required upon first signup.
   redirect("/");
 }
