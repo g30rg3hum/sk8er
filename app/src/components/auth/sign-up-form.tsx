@@ -76,8 +76,6 @@ export default function SignUpForm() {
     setIsLoading(true);
 
     try {
-      sessionStorage.setItem("verificationEmail", email);
-
       const res = await fetch("/api/auth/send-verification", {
         method: "POST",
         headers: {
@@ -105,6 +103,40 @@ export default function SignUpForm() {
     }
   };
 
+  // Step 2. Check verification code
+  const checkVerificationCode = async (email: string, code: string) => {
+    const id = toast.loading("Verifying code...");
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/verify-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          code,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Verification code is incorrect");
+        return false;
+      } else {
+        toast.success("Successfully verified code");
+        return true;
+      }
+    } catch {
+      toast.error("Failed to verify code");
+      return false;
+    } finally {
+      toast.dismiss(id);
+      setIsLoading(false);
+    }
+  };
+
   // Step navigation
   const isLastStep = currentStep === lastStepNumber;
   const next = async () => {
@@ -117,10 +149,19 @@ export default function SignUpForm() {
     // Validation errors
     if (!output) return;
 
-    // Send verification email step
+    const email = form.getValues("email");
+    const code = form.getValues("code");
+
+    // Send verification email
     if (currentStep === 0) {
-      const email = form.getValues("email");
       const success = await sendVerificationEmail(email);
+
+      if (!success) return;
+    }
+
+    // Verify code
+    if (currentStep === 1) {
+      const success = await checkVerificationCode(email, code);
 
       if (!success) return;
     }
