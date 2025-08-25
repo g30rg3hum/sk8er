@@ -3,21 +3,19 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const { id, password } = await request.json();
+    const { password } = await request.json();
 
-    if (!id || !password) {
+    if (!password) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    const supabaseAdmin = await createClient(true);
+    const supabase = await createClient();
 
-    // change password
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(id, {
-      password,
-    });
+    // change password for current authenticated user
+    const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

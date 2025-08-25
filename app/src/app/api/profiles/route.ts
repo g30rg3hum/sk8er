@@ -3,24 +3,41 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const { id, email, username } = await request.json();
+    const { id, username } = await request.json();
 
-    if (!id || !email || !username) {
+    if (!id || !username) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    const supabase = await createClient();
-    const { status, error } = await supabase.from("profiles").insert({
-      id,
-      email,
-      username,
-    });
+    const supabase = await createClient(true);
 
-    if (error)
-      return NextResponse.json({ error: error.message }, { status: status });
+    // get email from supabase auth.user
+    const { data, error: getEmailError } =
+      await supabase.auth.admin.getUserById(id);
+
+    if (getEmailError) {
+      return NextResponse.json(
+        { error: getEmailError.message },
+        { status: 500 }
+      );
+    }
+
+    const { status, error: insertError } = await supabase
+      .from("profiles")
+      .insert({
+        id,
+        email: data.user.email!, // successfully retrieved user here.
+        username,
+      });
+
+    if (insertError)
+      return NextResponse.json(
+        { error: insertError.message },
+        { status: status }
+      );
     else {
       return NextResponse.json(
         { message: "Profile created successfully" },

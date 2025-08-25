@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { z } from "zod";
@@ -69,7 +69,7 @@ const steps = [
   },
   {
     step: "details",
-    fields: ["username", "password"],
+    fields: ["username", "password", "confirmPassword"],
   },
 ];
 const lastStepNumber = steps.length - 1;
@@ -77,6 +77,38 @@ const lastStepNumber = steps.length - 1;
 export default function SignUpForm() {
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isFormDisabled, setIsFormDisabled] = useState<boolean>(true);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // If authenticated with no profile
+  // Skip to setting up username + password
+  useEffect(() => {
+    const initialCheck = async () => {
+      // Check if logged in
+      const user = await getClientSideUser();
+      // logged in
+      if (user) {
+        setUserId(user.id);
+
+        // check if has profile
+        const resProfile = await fetch(`/api/profiles/${user.id}`);
+
+        if (!resProfile.ok) {
+          toast("Previously logged in! Please set up your account", {
+            icon: "🔑",
+          });
+          setCurrentStep(2);
+          setIsFormDisabled(false);
+        }
+        // if has profile, keep form disabled. Can't sign up.
+      } else {
+        // Not logged in at all, can sign up.
+        setIsFormDisabled(false);
+      }
+    };
+
+    initialCheck();
+  }, []);
 
   // Step 1. Send verification email
   const sendVerificationEmail = async (email: string) => {
@@ -134,6 +166,11 @@ export default function SignUpForm() {
         return false;
       } else {
         toast.success("Successfully verified code");
+
+        // user should be authenticated
+        const user = await getClientSideUser();
+        if (user) setUserId(user.id);
+
         return true;
       }
     } catch {
@@ -146,6 +183,7 @@ export default function SignUpForm() {
   };
 
   // Step 3. Complete profile
+  // User already authenticated here.
   const completeProfile = async (
     email: string,
     username: string,
@@ -156,9 +194,7 @@ export default function SignUpForm() {
 
     try {
       // get the current logged in user's id
-      const user = await getClientSideUser();
-
-      if (!user) {
+      if (!userId) {
         toast.error(
           "There was an authentication issue during sign up - please try again from the start"
         );
@@ -172,8 +208,7 @@ export default function SignUpForm() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          id: user.id,
-          email,
+          id: userId,
           username,
         }),
       });
@@ -185,7 +220,6 @@ export default function SignUpForm() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          id: user.id,
           password,
         }),
       });
@@ -261,6 +295,7 @@ export default function SignUpForm() {
   const form = useForm<FullFormData>({
     resolver: zodResolver(fullSchema),
     defaultValues,
+    disabled: isFormDisabled,
   });
   const {
     control,
@@ -277,7 +312,7 @@ export default function SignUpForm() {
 
   return (
     <Form {...form}>
-      <form>
+      <form onSubmit={(e) => e.preventDefault()}>
         <div className="flex flex-col gap-3 mb-4">
           {currentStep === 0 && (
             <>
@@ -387,7 +422,7 @@ export default function SignUpForm() {
             )}
             onClick={next}
             type="button"
-            disabled={isLoading}
+            disabled={isLoading || isFormDisabled}
           >
             {isLastStep ? "Create" : "Continue"}
           </Button>
