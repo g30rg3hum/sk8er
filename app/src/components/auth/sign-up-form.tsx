@@ -5,7 +5,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SubmitHandler, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import {
   Form,
   FormControl,
@@ -16,35 +16,43 @@ import {
 } from "../ui/form";
 import clsx from "clsx";
 import toast from "react-hot-toast";
+import { getClientSideUser } from "@/utils/supabase/queries/auth";
 
-const fullSchema = z.object({
-  email: z.email("Please enter a valid email address"),
-  code: z
-    .string()
-    .min(6, "Verification code must be 6 digits")
-    .max(6, "Verification code must be 6 digits")
-    .regex(/^\d{6}$/, "Verification code must contain only numbers"),
-  username: z
-    .string()
-    .min(3, "Username must be at least 3 characters")
-    .max(30, "Username must be less than 30 characters"),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(100, "Password must be less than 100 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number")
-    .regex(
-      /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/,
-      "Password must contain uppercase, lowercase, number, and special character"
-    ),
-});
+const fullSchema = z
+  .object({
+    email: z.email("Please enter a valid email address"),
+    code: z
+      .string()
+      .min(6, "Verification code must be 6 digits")
+      .max(6, "Verification code must be 6 digits")
+      .regex(/^\d{6}$/, "Verification code must contain only numbers"),
+    username: z
+      .string()
+      .min(3, "Username must be at least 3 characters")
+      .max(30, "Username must be less than 30 characters"),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .max(100, "Password must be less than 100 characters")
+      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+      .regex(/[0-9]/, "Password must contain at least one number")
+      .regex(
+        /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/,
+        "Password must contain uppercase, lowercase, number, and special character"
+      ),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 const defaultValues: FullFormData = {
   email: "",
   code: "",
   username: "",
   password: "",
+  confirmPassword: "",
 };
 type FullFormData = z.infer<typeof fullSchema>;
 type FieldName = keyof FullFormData;
@@ -103,7 +111,7 @@ export default function SignUpForm() {
     }
   };
 
-  // Step 2. Check verification code
+  // Step 2. Check verification code, logs in user.
   const checkVerificationCode = async (email: string, code: string) => {
     const id = toast.loading("Verifying code...");
     setIsLoading(true);
@@ -137,6 +145,75 @@ export default function SignUpForm() {
     }
   };
 
+  // Step 3. Complete profile
+  const completeProfile = async (
+    email: string,
+    username: string,
+    password: string
+  ) => {
+    const id = toast.loading("Creating profile...");
+    setIsLoading(true);
+
+    try {
+      // get the current logged in user's id
+      const user = await getClientSideUser();
+
+      if (!user) {
+        toast.error(
+          "There was an authentication issue during sign up - please try again from the start"
+        );
+        return false;
+      }
+
+      // create profile record
+      const createProfileRes = await fetch("/api/profiles", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: user.id,
+          email,
+          username,
+        }),
+      });
+
+      // change password
+      const changePasswordRes = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: user.id,
+          password,
+        }),
+      });
+
+      if (!createProfileRes.ok || !changePasswordRes) {
+        const createProfileData = await createProfileRes.json();
+        const changePasswordData = await changePasswordRes.json();
+
+        if (createProfileData.error) toast.error(createProfileData.error);
+        if (changePasswordData.error) toast.error(changePasswordData.error);
+
+        if (!createProfileData.error && !changePasswordData.error)
+          toast.error("Failed to create profile");
+
+        return false;
+      } else {
+        toast.success("Profile created successfully");
+        return true;
+      }
+    } catch {
+      toast.error("Failed to create profile");
+      return false;
+    } finally {
+      toast.dismiss(id);
+      setIsLoading(false);
+    }
+  };
+
   // Step navigation
   const isLastStep = currentStep === lastStepNumber;
   const next = async () => {
@@ -151,6 +228,8 @@ export default function SignUpForm() {
 
     const email = form.getValues("email");
     const code = form.getValues("code");
+    const username = form.getValues("username");
+    const password = form.getValues("password");
 
     // Send verification email
     if (currentStep === 0) {
@@ -167,8 +246,9 @@ export default function SignUpForm() {
     }
 
     if (currentStep === lastStepNumber) {
-      await handleSubmit(onSubmit)();
-      setCurrentStep(0);
+      const success = await completeProfile(email, username, password);
+
+      if (!success) return;
     } else {
       setCurrentStep((step) => step + 1);
     }
@@ -184,20 +264,20 @@ export default function SignUpForm() {
   });
   const {
     control,
-    handleSubmit,
-    reset,
+    // handleSubmit,
+    // reset,
     trigger,
-    formState: { errors, isSubmitting },
+    // formState: { errors, isSubmitting },
   } = form;
 
-  const onSubmit: SubmitHandler<FullFormData> = (data: FullFormData) => {
-    console.log(data);
-    reset();
-  };
+  // const onSubmit: SubmitHandler<FullFormData> = (data: FullFormData) => {
+  //   console.log(data);
+  //   reset();
+  // };
 
   return (
     <Form {...form}>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form>
         <div className="flex flex-col gap-3 mb-4">
           {currentStep === 0 && (
             <>
@@ -269,11 +349,28 @@ export default function SignUpForm() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </>
           )}
         </div>
         <div className="flex gap-2">
-          {currentStep > 0 && (
+          {currentStep === 1 && (
             <Button
               className="w-1/2"
               onClick={prev}
@@ -285,7 +382,7 @@ export default function SignUpForm() {
           )}
           <Button
             className={clsx(
-              currentStep === 0 ? "w-full" : "w-1/2",
+              currentStep !== 1 ? "w-full" : "w-1/2",
               "transition-none"
             )}
             onClick={next}

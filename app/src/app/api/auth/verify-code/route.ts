@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createClient();
-    // verify verification code
+    // verify verification code, logs in user.
     const { error } = await supabase.auth.verifyOtp({
       email,
       token: code,
@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       // verification code is wrong
       return NextResponse.json(
+        // error message from supabase
         { error: error.message || "Invalid verification code" },
         { status: 400 }
       );
