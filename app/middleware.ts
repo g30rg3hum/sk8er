@@ -1,11 +1,10 @@
-import { NextRequest } from "next/server";
-import { updateSession } from "./src/utils/supabase/middleware";
+import { NextResponse } from "next/server";
+// import { updateSession } from "./src/utils/supabase/middleware";
 
-export const runtime = "nodejs";
-
-export async function middleware(request: NextRequest) {
+export async function middleware() {
   // uses middleware function for Supabase
-  return await updateSession(request);
+  // return await updateSession(request);
+  return NextResponse.next();
 }
 
 export const config = {
