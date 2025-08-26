@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 // import { updateSession } from "./src/utils/supabase/middleware";
 
-export async function middleware() {
+export async function middleware(request: NextRequest) {
   // uses middleware function for Supabase
   // return await updateSession(request);
   return NextResponse.next();
