@@ -33,12 +33,20 @@ export async function POST(request: NextRequest) {
         username,
       });
 
-    if (insertError)
+    if (insertError) {
+      // code 23505 for duplicate username
+      if (insertError.code === "23505") {
+        return NextResponse.json(
+          { error: "Username already exists" },
+          { status: 409 }
+        );
+      }
+
       return NextResponse.json(
         { error: insertError.message },
         { status: status }
       );
-    else {
+    } else {
       return NextResponse.json(
         { message: "Profile created successfully" },
         { status: 201 }

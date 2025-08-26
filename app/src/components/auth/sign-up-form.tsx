@@ -215,25 +215,41 @@ export default function SignUpForm() {
         }),
       });
 
-      // change password
-      const changePasswordRes = await fetch("/api/auth/change-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          password,
-        }),
-      });
+      // only attempt to change password if profile successfully created
+      let changePasswordRes;
+      if (createProfileRes.ok) {
+        changePasswordRes = await fetch("/api/auth/change-password", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            password,
+          }),
+        });
+      }
 
-      if (!createProfileRes.ok || !changePasswordRes) {
+      // profile creation was unsuccessful -> password change didn't occur
+      // or password change occurred AND there was an error
+      if (
+        !createProfileRes.ok ||
+        !changePasswordRes ||
+        (changePasswordRes && !changePasswordRes.ok)
+      ) {
         const createProfileData = await createProfileRes.json();
-        const changePasswordData = await changePasswordRes.json();
+        const createProfileError = createProfileData.error;
+        if (createProfileError) toast.error(createProfileError);
 
-        if (createProfileData.error) toast.error(createProfileData.error);
-        if (changePasswordData.error) toast.error(changePasswordData.error);
+        // if tried to change password
+        let changePasswordError;
+        if (changePasswordRes) {
+          const changePasswordData = await changePasswordRes.json();
+          changePasswordError = changePasswordData.error;
+          if (changePasswordError) toast.error(changePasswordError);
+        }
 
-        if (!createProfileData.error && !changePasswordData.error)
+        // output generic error if there were no error messages from both
+        if (!createProfileError && !changePasswordError)
           toast.error("Failed to create profile");
 
         return false;
@@ -281,10 +297,15 @@ export default function SignUpForm() {
       if (!success) return;
     }
 
+    // Profile completion
     if (currentStep === lastStepNumber) {
       const success = await completeProfile(email, username, password);
 
       if (!success) return;
+
+      // Success, reset the form.
+      reset();
+      setCurrentStep(0);
     } else {
       setCurrentStep((step) => step + 1);
     }
@@ -319,7 +340,7 @@ export default function SignUpForm() {
   const {
     control,
     // handleSubmit,
-    // reset,
+    reset,
     trigger,
     getValues,
     // formState: { errors, isSubmitting },
