@@ -306,6 +306,7 @@ export default function SignUpForm() {
       // Success, reset the form.
       reset();
       setCurrentStep(0);
+      // TODO: redirect to another page.
     } else {
       setCurrentStep((step) => step + 1);
     }

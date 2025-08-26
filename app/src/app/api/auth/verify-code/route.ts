@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
       );
     } else {
       // verification code is correct
+      revalidatePath("/", "layout");
       return NextResponse.json({ message: "Verification successful" });
     }
   } catch (error) {
