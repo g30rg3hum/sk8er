@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { updateSession } from "./src/utils/supabase/middleware";
 
+export const runtime = "nodejs";
+
 export async function middleware(request: NextRequest) {
   // uses middleware function for Supabase
   return await updateSession(request);
