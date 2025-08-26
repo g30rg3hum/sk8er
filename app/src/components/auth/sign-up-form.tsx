@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -79,6 +80,7 @@ export default function SignUpForm() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isFormDisabled, setIsFormDisabled] = useState<boolean>(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState<number>(0);
 
   // If authenticated with no profile
   // Skip to setting up username + password
@@ -291,6 +293,23 @@ export default function SignUpForm() {
     if (currentStep > 0) setCurrentStep((step) => step - 1);
   };
 
+  // Countdown between OTP requests
+  const startResendCooldown = () => {
+    setResendCooldown(60);
+
+    const intervalId = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(intervalId);
+          return 0;
+        } else {
+          return prev - 1;
+        }
+      });
+    }, 1000);
+  };
+  const canSendCode = resendCooldown === 0;
+
   // React hook form
   const form = useForm<FullFormData>({
     resolver: zodResolver(fullSchema),
@@ -302,6 +321,7 @@ export default function SignUpForm() {
     // handleSubmit,
     // reset,
     trigger,
+    getValues,
     // formState: { errors, isSubmitting },
   } = form;
 
@@ -346,6 +366,28 @@ export default function SignUpForm() {
                     <FormControl>
                       <Input type="text" placeholder="123456" {...field} />
                     </FormControl>
+                    <FormDescription>
+                      Please enter the code sent to your email. <br />
+                      Need a new one?{" "}
+                      {canSendCode ? (
+                        <>
+                          Click{" "}
+                          <Button
+                            variant="link"
+                            className="p-0"
+                            onClick={async () => {
+                              await sendVerificationEmail(getValues("email"));
+                              startResendCooldown();
+                            }}
+                          >
+                            here
+                          </Button>{" "}
+                          to resend.
+                        </>
+                      ) : (
+                        <>Please wait {resendCooldown} seconds.</>
+                      )}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

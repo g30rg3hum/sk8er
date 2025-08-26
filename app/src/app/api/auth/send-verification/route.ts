@@ -1,15 +1,33 @@
 import VerificationEmail from "@/components/emails/verification";
 import generateRandomPassword from "@/utils/random/password";
 import resend from "@/utils/resend/client";
+import { rateLimiter } from "@/utils/supabase/limiter/otp";
 import { getUserProfileByEmail } from "@/utils/supabase/queries/profiles";
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { RateLimiterRes } from "rate-limiter-flexible";
 
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json();
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    // rate limiting for the email
+    const key = `otp:${email}`;
+    try {
+      await rateLimiter.consume(key, 1);
+    } catch (rateLimiterRes) {
+      const sBeforeNext = Math.ceil(
+        (rateLimiterRes as RateLimiterRes).msBeforeNext / 1000
+      );
+      return NextResponse.json(
+        {
+          error: `Too many verification requests for this email. Please wait ${sBeforeNext} seconds.`,
+        },
+        { status: 429 }
+      );
     }
 
     const supabaseAdmin = await createClient(true);
