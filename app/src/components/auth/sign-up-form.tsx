@@ -355,7 +355,7 @@ export default function SignUpForm() {
   return (
     <Form {...form}>
       <form onSubmit={(e) => e.preventDefault()}>
-        <div className="flex flex-col gap-3 mb-4">
+        <div className="flex flex-col gap-3 mb-6">
           {currentStep === 0 && (
             <>
               <FormField

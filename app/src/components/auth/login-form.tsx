@@ -16,10 +16,11 @@ import { Button } from "../ui/button";
 import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
 import { getClientSideUser } from "@/utils/supabase/queries/auth";
+import { absenceMessage } from "@/utils/constants/form/validation-messages";
 
 const schema = z.object({
   email: z.email("Please enter a valid email address"),
-  password: z.string(),
+  password: z.string().min(1, absenceMessage),
 });
 type FormData = z.infer<typeof schema>;
 const defaultValues: FormData = {
@@ -84,7 +85,7 @@ export default function LoginForm() {
   return (
     <Form {...form}>
       <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="flex flex-col gap-3 mb-4">
+        <div className="flex flex-col gap-3 mb-6">
           <FormField
             control={control}
             name="email"

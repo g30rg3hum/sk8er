@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      posts: {
+        Row: {
+          asset_type: string
+          asset_url: string
+          created_at: string | null
+          description: string
+          id: string
+          title: string
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          asset_type: string
+          asset_url: string
+          created_at?: string | null
+          description: string
+          id?: string
+          title: string
+          type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          asset_type?: string
+          asset_url?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          title?: string
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string | null
