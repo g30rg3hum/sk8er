@@ -16,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-import { startTransition, useRef } from "react";
+import { useRef } from "react";
 import { createPost } from "@/utils/actions/posts";
 import toast from "react-hot-toast";
 import { schema } from "@/utils/constants/form/schemas/create-post";
