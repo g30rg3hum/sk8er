@@ -100,7 +100,7 @@ export default function Video({ url, className }: Props) {
   return (
     <div
       className={clsx(
-        "relative overflow-hidden bg-black rounded-md",
+        "relative overflow-hidden bg-black rounded-md object-cover",
         className
       )}
     >
