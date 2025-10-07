@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -18,6 +16,7 @@ import {
 import clsx from "clsx";
 import toast from "react-hot-toast";
 import { getClientSideUser } from "@/utils/supabase/queries/auth";
+import { useRouter } from "next/navigation";
 
 const fullSchema = z
   .object({
@@ -75,7 +74,12 @@ const steps = [
 ];
 const lastStepNumber = steps.length - 1;
 
-export default function SignUpForm() {
+interface Props {
+  closeDialog: () => void;
+}
+export default function SignUpForm({ closeDialog }: Props) {
+  const router = useRouter();
+
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isFormDisabled, setIsFormDisabled] = useState<boolean>(true);
@@ -306,7 +310,9 @@ export default function SignUpForm() {
       // Success, reset the form.
       reset();
       setCurrentStep(0);
-      // TODO: redirect to another page.
+
+      router.push("/");
+      closeDialog();
     } else {
       setCurrentStep((step) => step + 1);
     }
@@ -470,20 +476,12 @@ export default function SignUpForm() {
         </div>
         <div className="flex gap-2">
           {currentStep === 1 && (
-            <Button
-              className="w-1/2"
-              onClick={prev}
-              type="button"
-              variant="secondary"
-            >
+            <Button onClick={prev} type="button" variant="secondary">
               Back
             </Button>
           )}
           <Button
-            className={clsx(
-              currentStep !== 1 ? "w-full" : "w-1/2",
-              "transition-none"
-            )}
+            className={clsx("transition-none")}
             onClick={next}
             type="button"
             disabled={isLoading || isFormDisabled}

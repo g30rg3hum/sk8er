@@ -1,5 +1,3 @@
-"use client";
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -17,6 +15,7 @@ import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
 import { getClientSideUser } from "@/utils/supabase/queries/auth";
 import { absenceMessage } from "@/utils/constants/form/validation-messages";
+import { useRouter } from "next/navigation";
 
 const schema = z.object({
   email: z.email("Please enter a valid email address"),
@@ -28,7 +27,11 @@ const defaultValues: FormData = {
   password: "",
 };
 
-export default function LoginForm() {
+interface Props {
+  closeDialog: () => void;
+}
+export default function LoginForm({ closeDialog }: Props) {
+  const router = useRouter();
   const [isFormDisabled, setIsFormDisabled] = useState<boolean>(true);
 
   // If not actually authenticated, keep form disabled.
@@ -73,7 +76,8 @@ export default function LoginForm() {
         toast.success("Login successful");
         reset();
         setIsFormDisabled(true);
-        // TODO: redirect user
+        router.push("/");
+        closeDialog();
       }
     } catch {
       toast.error("Login failed. Please try again.");
@@ -117,11 +121,7 @@ export default function LoginForm() {
             )}
           />
         </div>
-        <Button
-          className="w-full"
-          disabled={isSubmitting || isFormDisabled}
-          type="submit"
-        >
+        <Button disabled={isSubmitting || isFormDisabled} type="submit">
           Login
         </Button>
       </form>

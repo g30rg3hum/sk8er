@@ -44,14 +44,13 @@ export async function updateSession(request: NextRequest) {
 
   if (
     !user &&
+    // places to not redirect on.
     request.nextUrl.pathname !== "/" && // Don't redirect on homepage.
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth") &&
     !request.nextUrl.pathname.startsWith("/error")
   ) {
-    // no user, respond by redirecting user to login page
+    // no user, respond by redirecting user to home
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 

@@ -13,8 +13,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimisation files)
      * - favicon.ico (favicon file)
-     * - api (API routes) <- must be excluded TODO: may want to select API routes
      */
-    "/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
