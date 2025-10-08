@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClient(true);
     // verify verification code, logs in user.
     const { error } = await supabase.auth.verifyOtp({
       email,
@@ -28,8 +28,23 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     } else {
+      // get the user id first
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const userId = user!.id;
+
+      // sign out immediately after verification.
+      await supabase.auth.signOut();
+
+      // and delete the user record.
+      // don't need it anymore, already verified code alongside the email.
+      // safe for endpoint because only deleted by the user (thru OTP verification)
+      await supabase.auth.admin.deleteUser(userId);
+
+      // on next step, the user account + profile creation happens.
+
       // verification code is correct
-      revalidatePath("/", "layout");
       return NextResponse.json({ message: "Verification successful" });
     }
   } catch (error) {

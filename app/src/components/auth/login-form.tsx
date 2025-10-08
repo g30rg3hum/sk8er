@@ -28,7 +28,7 @@ const defaultValues: FormData = {
 };
 
 interface Props {
-  closeDialog: () => void;
+  closeDialog?: () => void;
 }
 export default function LoginForm({ closeDialog }: Props) {
   const router = useRouter();
@@ -76,8 +76,11 @@ export default function LoginForm({ closeDialog }: Props) {
         toast.success("Login successful");
         reset();
         setIsFormDisabled(true);
+
         router.push("/");
-        closeDialog();
+        router.refresh();
+
+        if (closeDialog) closeDialog();
       }
     } catch {
       toast.error("Login failed. Please try again.");

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { z } from "zod";
@@ -15,8 +15,10 @@ import {
 } from "../ui/form";
 import clsx from "clsx";
 import toast from "react-hot-toast";
-import { getClientSideUser } from "@/utils/supabase/queries/auth";
 import { useRouter } from "next/navigation";
+import { Info } from "lucide-react";
+import { Tooltip, TooltipContent } from "../ui/tooltip";
+import { TooltipTrigger } from "@radix-ui/react-tooltip";
 
 const fullSchema = z
   .object({
@@ -75,48 +77,22 @@ const steps = [
 const lastStepNumber = steps.length - 1;
 
 interface Props {
-  closeDialog: () => void;
+  closeDialog?: () => void;
+  setIsLoginTabDisabled?: (value: boolean) => void;
 }
-export default function SignUpForm({ closeDialog }: Props) {
+export default function SignUpForm({
+  closeDialog,
+  setIsLoginTabDisabled,
+}: Props) {
   const router = useRouter();
 
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isFormDisabled, setIsFormDisabled] = useState<boolean>(true);
-  const [userId, setUserId] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState<number>(0);
 
-  // If authenticated with no profile
-  // Skip to setting up username + password
-  useEffect(() => {
-    const initialCheck = async () => {
-      // Check if logged in
-      const user = await getClientSideUser();
-      // logged in
-      if (user) {
-        setUserId(user.id);
-
-        // check if has profile
-        const resProfile = await fetch(`/api/profiles/${user.id}`);
-
-        if (!resProfile.ok) {
-          toast("Previously logged in! Please set up your account", {
-            icon: "🔑",
-          });
-          setCurrentStep(2);
-          setIsFormDisabled(false);
-        }
-        // if has profile, keep form disabled. Can't sign up.
-      } else {
-        // Not logged in at all, can sign up.
-        setIsFormDisabled(false);
-      }
-    };
-
-    initialCheck();
-  }, []);
-
   // Step 1. Send verification email
+  // This creates a user, unverified.
+  // We need this because we need link between email and the code.
   const sendVerificationEmail = async (email: string) => {
     const id = toast.loading("Sending verification code...");
     setIsLoading(true);
@@ -149,7 +125,7 @@ export default function SignUpForm({ closeDialog }: Props) {
     }
   };
 
-  // Step 2. Check verification code, logs in user.
+  // Step 2. Check verification code, but don't want to log in user yet.
   const checkVerificationCode = async (email: string, code: string) => {
     const id = toast.loading("Verifying code...");
     setIsLoading(true);
@@ -173,10 +149,6 @@ export default function SignUpForm({ closeDialog }: Props) {
       } else {
         toast.success("Successfully verified code");
 
-        // user should be authenticated
-        const user = await getClientSideUser();
-        if (user) setUserId(user.id);
-
         return true;
       }
     } catch {
@@ -188,24 +160,53 @@ export default function SignUpForm({ closeDialog }: Props) {
     }
   };
 
-  // Step 3. Complete profile
+  // Step 3. Complete profile + create the actual user account.
   // User already authenticated here.
-  const completeProfile = async (
+  const completeAccount = async (
     email: string,
     username: string,
     password: string
   ) => {
-    const id = toast.loading("Creating profile...");
+    const id = toast.loading("Creating account...");
     setIsLoading(true);
 
     try {
-      // get the current logged in user's id
-      if (!userId) {
-        toast.error(
-          "There was an authentication issue during sign up - please try again from the start"
-        );
+      // need user record before profile since linked
+      // no user account or profile here at this point.
+
+      // check if username exists
+      const checkUsernameRes = await fetch(
+        `/api/profiles/check-username?username=${username}`,
+        { method: "GET" }
+      );
+
+      const data = await checkUsernameRes.json();
+
+      if (data.exists) {
+        toast.error("Username already exists.");
         return false;
       }
+
+      // now can create user account
+      const createUserRes = await fetch("/api/auth/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      // only proceed if user creation worked
+      if (!createUserRes.ok) {
+        toast.error("Failed to create user account. Please contact support.");
+        return false;
+      }
+
+      // successfuly created user here, so id should be returned
+      const userId = (await createUserRes.json()).id;
 
       // create profile record
       const createProfileRes = await fetch("/api/profiles", {
@@ -214,53 +215,20 @@ export default function SignUpForm({ closeDialog }: Props) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          email,
           id: userId,
           username,
         }),
       });
 
-      // only attempt to change password if profile successfully created
-      let changePasswordRes;
-      if (createProfileRes.ok) {
-        changePasswordRes = await fetch("/api/auth/change-password", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            password,
-          }),
-        });
-      }
-
-      // profile creation was unsuccessful -> password change didn't occur
-      // or password change occurred AND there was an error
-      if (
-        !createProfileRes.ok ||
-        !changePasswordRes ||
-        (changePasswordRes && !changePasswordRes.ok)
-      ) {
-        const createProfileData = await createProfileRes.json();
-        const createProfileError = createProfileData.error;
-        if (createProfileError) toast.error(createProfileError);
-
-        // if tried to change password
-        let changePasswordError;
-        if (changePasswordRes) {
-          const changePasswordData = await changePasswordRes.json();
-          changePasswordError = changePasswordData.error;
-          if (changePasswordError) toast.error(changePasswordError);
-        }
-
-        // output generic error if there were no error messages from both
-        if (!createProfileError && !changePasswordError)
-          toast.error("Failed to create profile");
-
+      if (!createProfileRes.ok) {
+        toast.error("Failed to create profile. Please contact support.");
         return false;
-      } else {
-        toast.success("Profile created successfully");
-        return true;
       }
+
+      // Else, all is well.
+      toast.success("Account created successfully");
+      return true;
     } catch {
       toast.error("Failed to create profile");
       return false;
@@ -289,6 +257,8 @@ export default function SignUpForm({ closeDialog }: Props) {
 
     // Send verification email
     if (currentStep === 0) {
+      if (setIsLoginTabDisabled) setIsLoginTabDisabled(true);
+
       const success = await sendVerificationEmail(email);
 
       if (!success) return;
@@ -301,9 +271,9 @@ export default function SignUpForm({ closeDialog }: Props) {
       if (!success) return;
     }
 
-    // Profile completion
+    // Account completion
     if (currentStep === lastStepNumber) {
-      const success = await completeProfile(email, username, password);
+      const success = await completeAccount(email, username, password);
 
       if (!success) return;
 
@@ -312,13 +282,19 @@ export default function SignUpForm({ closeDialog }: Props) {
       setCurrentStep(0);
 
       router.push("/");
-      closeDialog();
+      router.refresh();
+
+      if (closeDialog) closeDialog();
     } else {
       setCurrentStep((step) => step + 1);
     }
   };
   const prev = () => {
     if (currentStep > 0) setCurrentStep((step) => step - 1);
+
+    // back to step 0, enable the login tab
+    if (currentStep - 1 === 0 && setIsLoginTabDisabled)
+      setIsLoginTabDisabled(false);
   };
 
   // Countdown between OTP requests
@@ -342,7 +318,6 @@ export default function SignUpForm({ closeDialog }: Props) {
   const form = useForm<FullFormData>({
     resolver: zodResolver(fullSchema),
     defaultValues,
-    disabled: isFormDisabled,
   });
   const {
     control,
@@ -394,6 +369,7 @@ export default function SignUpForm({ closeDialog }: Props) {
                     <FormControl>
                       <Input type="text" placeholder="123456" {...field} />
                     </FormControl>
+                    <FormMessage />
                     <FormDescription>
                       Please enter the code sent to your email. <br />
                       Need a new one?{" "}
@@ -416,7 +392,6 @@ export default function SignUpForm({ closeDialog }: Props) {
                         <>Please wait {resendCooldown} seconds.</>
                       )}
                     </FormDescription>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -442,7 +417,21 @@ export default function SignUpForm({ closeDialog }: Props) {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>
+                      Password{" "}
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info size={15} />
+                        </TooltipTrigger>
+                        <TooltipContent className="w-max">
+                          <p className="max-w-xs">
+                            Must contain at least 8 characters: 1 uppercase
+                            letter, 1 lowercase letter, 1 special character and
+                            1 number.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -484,7 +473,7 @@ export default function SignUpForm({ closeDialog }: Props) {
             className={clsx("transition-none")}
             onClick={next}
             type="button"
-            disabled={isLoading || isFormDisabled}
+            disabled={isLoading}
           >
             {isLastStep ? "Create" : "Continue"}
           </Button>
